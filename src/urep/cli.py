@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -16,6 +17,7 @@ from .gitrepo import GitError, GitRepo, git_version
 from .hlc import Clock
 from .paths import PathError, mirror_rel
 from .state import EventLog, RuntimeState
+from .transport import TransportError, ping_peer
 
 app = typer.Typer(
     add_completion=False,
@@ -84,6 +86,15 @@ def _rel(path: str | None) -> str | None:
         return mirror_rel(Path(path))
     except PathError as exc:
         _fail(exc)
+
+
+def _read_peers(config: Config) -> list[dict[str, Any]]:
+    try:
+        data = json.loads((config.state_dir / "peers.json").read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+    peers = data.get("peers") if isinstance(data, dict) else None
+    return peers if isinstance(peers, list) else []
 
 
 @app.callback(invoke_without_command=True)
@@ -156,6 +167,27 @@ def version() -> None:
     typer.echo(f"urep {__version__}")
 
 
+@app.command()
+def ping(address: str) -> None:
+    config = _load(True)
+    node = make_node_id(config.prefix)
+    try:
+        result = ping_peer(
+            address,
+            token=config.token.get_secret_value(),
+            node_id=node,
+            tags=config.tags,
+            role=config.role,
+        )
+    except TransportError as exc:
+        _fail(exc)
+    tags = ",".join(result["tags"]) or "-"
+    typer.echo(
+        f"pong from {result['node_id']} role={result['role']} "
+        f"tags={tags} rtt={result['rtt_ms']:.1f}ms"
+    )
+
+
 @app.command("config")
 def config_command(json_output: bool = typer.Option(False, "--json")) -> None:
     config = _load(False)
@@ -189,13 +221,32 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
     tombstones = [item for item in state.values() if item.deleted]
     events = EventLog(config.state_dir / "events.jsonl").read()
     last = events[-1] if events else None
+    color = "PAUSED" if paused else "GREEN"
+    if not paused and last:
+        result = last.get("result")
+        level = last.get("level")
+        if level == "error" or result in {
+            "pre_hook_failed",
+            "error",
+            "path_not_allowed",
+            "path_forbidden",
+            "bad_hash",
+        }:
+            color = "RED"
+        elif level == "warning" or result in {
+            "hook_failed",
+            "non_atomic_write",
+            "too_large",
+        }:
+            color = "YELLOW"
     head = repo.head()
+    peer_list = _read_peers(config)
     path_list = [str(path) for path in config.paths]
     root_list = [str(root) for root in config.accept_roots]
     data = {
         "node": None,
         "role": config.role,
-        "color": "PAUSED" if paused else "GREEN",
+        "color": color,
         "paused": paused,
         "tags": config.tags,
         "paths": path_list,
@@ -205,6 +256,7 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
         "commits": repo.commit_count(),
         "files": len(files),
         "tombstones": len(tombstones),
+        "peers": len(peer_list),
         "last_event": last,
     }
     if json_output:
@@ -221,6 +273,7 @@ def status(json_output: bool = typer.Option(False, "--json")) -> None:
     typer.echo(f"commits     {data['commits']}")
     typer.echo(f"files       {data['files']}")
     typer.echo(f"tombstones  {data['tombstones']}")
+    typer.echo(f"peers       {data['peers']}")
     typer.echo(f"head        {data['head'] or '-'}")
     if last:
         typer.echo(
@@ -417,8 +470,34 @@ def sync(
 
 
 @app.command()
-def peers() -> None:
-    typer.echo("no peers (network layer is not implemented yet, M2+)")
+def peers(watch: bool = typer.Option(False, "--watch")) -> None:
+    while True:
+        config = _load(False)
+        items = _read_peers(config)
+        if not items:
+            typer.echo("no peers")
+        else:
+            typer.echo(
+                f"{'NODE':<38} {'ROLE':<6} {'TAGS':<20} {'ADDRESS':<24} LAST SEEN"
+            )
+            now = time.time()
+            for item in items:
+                node_id = str(item.get("node_id", "?"))
+                role = str(item.get("role", "?"))
+                tags = ",".join(str(tag) for tag in item.get("tags", [])) or "-"
+                address = str(item.get("address", "?"))
+                last_seen = item.get("last_seen")
+                age = (
+                    f"{int(now - last_seen)}s ago"
+                    if isinstance(last_seen, (int, float))
+                    else "?"
+                )
+                typer.echo(
+                    f"{node_id:<38} {role:<6} {tags:<20} {address:<24} {age}"
+                )
+        if not watch:
+            return
+        time.sleep(2)
 
 
 @app.command()

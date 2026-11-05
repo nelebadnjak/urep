@@ -129,11 +129,15 @@ class Config(BaseModel):
     repo_dir: Path
     accept_roots: list[Path]
     listen: str
+    multicast: bool
     multicast_group: str
     seeds: list[str]
+    announce_interval_s: int
+    peer_timeout_s: int
     pre_hooks: list[str]
     post_hooks: list[str]
     hooks_enabled: bool
+    hook_timeout_s: int
     debounce_ms: int
     anti_entropy_s: int
     max_clock_skew_s: int
@@ -232,11 +236,17 @@ class Config(BaseModel):
             repo_dir=repo_dir,
             accept_roots=roots,
             listen=listen,
+            multicast=_env_bool("UREP_MULTICAST", True),
             multicast_group=multicast_group,
             seeds=_csv(os.environ.get("UREP_SEEDS")) or [],
+            announce_interval_s=parse_duration_s(
+                os.environ.get("UREP_ANNOUNCE_INTERVAL", "5s")
+            ),
+            peer_timeout_s=parse_duration_s(os.environ.get("UREP_PEER_TIMEOUT", "30s")),
             pre_hooks=pre_hooks,
             post_hooks=post_hooks,
             hooks_enabled=_env_bool("UREP_HOOKS_ENABLED", True),
+            hook_timeout_s=parse_duration_s(os.environ.get("UREP_HOOK_TIMEOUT", "30s")),
             debounce_ms=parse_duration_ms(os.environ.get("UREP_DEBOUNCE", "200ms")),
             anti_entropy_s=parse_duration_s(os.environ.get("UREP_ANTI_ENTROPY", "60s")),
             max_clock_skew_s=parse_duration_s(os.environ.get("UREP_MAX_CLOCK_SKEW", "5m")),
@@ -271,11 +281,15 @@ class Config(BaseModel):
             "repo_dir": str(self.repo_dir),
             "accept_roots": [str(root) for root in self.accept_roots],
             "listen": self.listen,
+            "multicast": self.multicast,
             "multicast_group": self.multicast_group,
             "seeds": self.seeds,
+            "announce_interval_s": self.announce_interval_s,
+            "peer_timeout_s": self.peer_timeout_s,
             "pre_hooks": self.pre_hooks,
             "post_hooks": self.post_hooks,
             "hooks_enabled": self.hooks_enabled,
+            "hook_timeout_s": self.hook_timeout_s,
             "debounce_ms": self.debounce_ms,
             "anti_entropy_s": self.anti_entropy_s,
             "max_clock_skew_s": self.max_clock_skew_s,

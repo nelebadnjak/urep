@@ -71,6 +71,12 @@ def is_forbidden(path: Path, extra: list[Path]) -> bool:
     return False
 
 
+def tag_match(message: list[str], node: list[str]) -> bool:
+    if "*" in message or "*" in node:
+        return True
+    return bool(set(message) & set(node))
+
+
 def ensure_parent(path: Path, mode: int) -> None:
     if path.parent.exists():
         return

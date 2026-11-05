@@ -24,13 +24,13 @@ lint:
 	$(COMPOSE_DEV) run --rm dev sh -c "ruff check . && mypy src"
 
 build:
-	docker build -t urep:dev .
+	docker build -t urep:latest .
 
 smoke: build
-	docker run --rm urep:dev version
-	docker run --rm urep:dev doctor
+	docker run --rm urep:latest version
+	docker run --rm urep:latest doctor
 	docker run --rm -e UREP_TOKEN=test -e UREP_PATH=/tmp/x -e UREP_ACCEPT_ROOTS=/tmp \
-		urep:dev status --json
+		urep:latest status --json
 
 clean:
 	$(COMPOSE_DEV) down -v

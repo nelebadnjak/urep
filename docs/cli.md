@@ -87,7 +87,6 @@ Preporuka: **jedan kontejner = jedan fajl = jedan hook**.
 ---
 
 ## 3. Init i token
-
 ```bash
 urep init --print-token
 # Generated /etc/urep/token (0600)
@@ -107,6 +106,15 @@ urep id --prefix bg
 ```
 
 `urep id` je samo informativno — daemon uvek generiše novi UUID pri startu i ne prima ga spolja.
+
+## 3.1 Ping
+
+```bash
+urep ping 10.0.0.12:7801
+# pong from 3f9a1c2b-7d4e-4a8f-9c1d-2e3f4a5b6c7d role=peer tags=test rtt=1.2ms
+```
+
+Token se čita iz `UREP_TOKEN` / `UREP_TOKEN_FILE` (ili `--token`). `ping` proverava handshake i AEAD bez čekanja na discovery.
 
 ---
 
@@ -253,10 +261,14 @@ Izmena konfiguracije = restart procesa/kontejnera sa novim env-om ili flagovima.
 | `UREP_STATE_DIR` | `/var/lib/urep` | — |
 | `UREP_ACCEPT_ROOTS` | data dir + parent dirs putanja | `--root` |
 | `UREP_LISTEN` | `0.0.0.0:7801` | `--listen` |
+| `UREP_MULTICAST` | `true` | — |
 | `UREP_MULTICAST_GROUP` | `239.255.42.99:7802` | — |
+| `UREP_ANNOUNCE_INTERVAL` | `5s` | — |
+| `UREP_PEER_TIMEOUT` | `30s` | — |
 | `UREP_SEEDS` | prazno | — |
 | `UREP_PRE_HOOK` / `UREP_POST_HOOK` | prazno | `--pre-hook` / `--post-hook` |
 | `UREP_HOOKS_ENABLED` | `true` | — |
+| `UREP_HOOK_TIMEOUT` | `30s` | — |
 | `UREP_DEBOUNCE` | `200ms` | — |
 | `UREP_ANTI_ENTROPY` | `60s` | — |
 | `UREP_MAX_CLOCK_SKEW` | `5m` | — |

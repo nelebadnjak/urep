@@ -1,4 +1,4 @@
-# uRep — specifikacija v1.7
+# uRep — specifikacija v1.8
 
 **micro replication** — decentralizovani P2P sync agent za konfiguracione fajlove. Bez lidera, bez baze, sa lokalnim git-om kao transakcionom istorijom.
 
@@ -102,10 +102,14 @@ Git **nikad** ne dobija `--work-tree=/`. Stvarni fajlovi se pišu isključivo na
 | `UREP_STATE_DIR` | `/var/lib/urep` | — |
 | `UREP_ACCEPT_ROOTS` (comma-separated) | data dir + parent dirs svih `UREP_PATH` | `--root` (repeatable) |
 | `UREP_LISTEN` | `0.0.0.0:7801` | `--listen` |
+| `UREP_MULTICAST` | `true` | — |
 | `UREP_MULTICAST_GROUP` | `239.255.42.99:7802` | — |
+| `UREP_ANNOUNCE_INTERVAL` | `5s` | — |
+| `UREP_PEER_TIMEOUT` | `30s` | — |
 | `UREP_SEEDS` (comma-separated) | prazno | — |
 | `UREP_PRE_HOOK` / `UREP_POST_HOOK` | prazno; shell, newline-separated | `--pre-hook` / `--post-hook` |
 | `UREP_HOOKS_ENABLED` | `true` | — |
+| `UREP_HOOK_TIMEOUT` | `30s` | — |
 | `UREP_DEBOUNCE` | `200ms` | — |
 | `UREP_ANTI_ENTROPY` | `60s` | — |
 | `UREP_MAX_CLOCK_SKEW` | `5m` | — |
@@ -333,12 +337,14 @@ git update-ref refs/urep/conflict/<hexpath>/<hlc> <losing_commit>
 
 ## 13. Anti-entropy i join
 
-- Na connect i periodično (`UREP_ANTI_ENTROPY`, 60 s ± 20% jitter): `MANIFEST` batchevi iz in-memory mape.
+- Na connect i periodično (`UREP_ANTI_ENTROPY`, 60 s): `MANIFEST` batchevi iz in-memory mape.
 - Diff po `(path, h, v)` → novija strana šalje `FILE_PUT` sa hooks iz mape.
+- Primenjena remote izmena se prosleđuje dalje **osim pošiljaocu**, da bi stigla i do nodova koji nisu direktno povezani.
+- Fajlovi >900 KB idu kroz `FILE_CHUNK` (256 KB); gornja granica je `UREP_MAX_FILE_SIZE`.
 - Novi nod: lokalni fajl se snapshot-uje, pa klaster pobeđuje.
 - `slave` sme `MANIFEST_REQ` + prijem; nikad ne šalje fajlove.
-- `run_on_sync` je uvek `true` u v1.5 (nema TOML-a); `urep sync --no-hooks` preskače hooks za jednu sinkronizaciju.
-- Manifest za 10k fajlova ~1 MB → batch 1000.
+- Hooks se izvršavaju i pri catch-up-u; `urep sync --no-hooks` preskače hooks za jednu sinkronizaciju.
+- Manifest za 10k fajlova ~1 MB → batch 200.
 
 ## 14. Pause / resume
 
@@ -363,6 +369,7 @@ urep [--token T] [--prefix P] [--tag T]... [--path P]... [--root R]...
 
 urep init [--token-file PATH] [--print-token]
 urep id [--prefix P]              # generiše node ID bez pokretanja daemona
+urep ping HOST:PORT               # handshake + PING/PONG
 urep daemon [-f] [--slave]
 urep status [--json]
 urep peers [--watch]
@@ -484,6 +491,14 @@ Key rotation · relay za NAT · bandwidth limit · uid/gid/xattr · symlink repl
 - `docker-compose.dev.yml` / `docker-compose.test.yml`, `make` targeti, CI bez `setup-python`.
 - Multicast napomena: Docker bridge ne prosleđuje multicast; integracija koristi `UREP_SEEDS`, `-m multicast` ide na host mrežu.
 - M0 dodat kao obavezan prvi korak.
+
+**v1.7 → v1.8 (implementirano M2–M4):**
+- **M2:** token handshake (HMAC challenge, token se ne šalje), HKDF + ChaCha20-Poly1305 frame enkripcija, TCP transport, `urep ping`.
+- **M3:** UDP multicast discovery sa AEAD-om, gossip, tagovi/role, `peers.json`, `urep peers [--watch]`.
+- **M4:** `FILE_PUT` / `FILE_DELETE`, chunking, LWW apply, `accept_roots`, tag provera, pre/post hooks na receiveru, tombstone brisanje.
+- Manifest anti-entropy na connect i periodično; primenjene izmene se prosleđuju dalje kroz mesh (osim pošiljaocu).
+- `urep status` boja se izvodi iz poslednjeg eventa (`GREEN`/`YELLOW`/`RED`/`PAUSED`).
+- Hook-ovi su još per-file; batch koalescencija ostaje za M5.
 
 ## 24. Napomene pre razvoja
 

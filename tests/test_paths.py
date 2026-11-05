@@ -11,6 +11,7 @@ from urep.paths import (
     mirror_rel,
     normalize,
     real_parent_allowed,
+    tag_match,
 )
 
 
@@ -54,3 +55,11 @@ def test_forbidden_paths(tmp_path: Path) -> None:
     assert is_forbidden(Path("/etc/urep/token"), [])
     assert is_forbidden(Path("/proc/1/environ"), [])
     assert not is_forbidden(tmp_path / "app.yaml", [])
+
+
+def test_tag_match() -> None:
+    assert tag_match(["a"], ["a", "b"])
+    assert tag_match(["*"], ["a"])
+    assert tag_match(["a"], ["*"])
+    assert not tag_match(["a"], ["b"])
+    assert not tag_match([], ["a"])

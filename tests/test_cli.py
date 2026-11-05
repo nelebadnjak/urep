@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -63,6 +64,31 @@ def test_status_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assert data["role"] == "peer"
     assert data["color"] == "GREEN"
     assert data["commits"] == 0
+
+
+@pytest.mark.unit
+def test_peers_reads_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("UREP_TOKEN", "secret")
+    monkeypatch.setenv("UREP_STATE_DIR", str(tmp_path))
+    (tmp_path / "peers.json").write_text(
+        json.dumps(
+            {
+                "peers": [
+                    {
+                        "node_id": "node-x",
+                        "role": "peer",
+                        "tags": ["a"],
+                        "address": "1.2.3.4:7801",
+                        "last_seen": time.time(),
+                    }
+                ]
+            }
+        )
+    )
+    result = runner.invoke(app, ["peers"])
+    assert result.exit_code == 0
+    assert "node-x" in result.output
+    assert "1.2.3.4:7801" in result.output
 
 
 @pytest.mark.unit
