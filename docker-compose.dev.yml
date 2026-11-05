@@ -1,0 +1,18 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: urep:dev
+    working_dir: /src
+    volumes:
+      - .:/src
+      - urep-dev-state:/var/lib/urep
+    environment:
+      UREP_TOKEN: dev-token
+      UREP_TAG: dev
+      UREP_STATE_DIR: /var/lib/urep
+    command: ["bash"]
+
+volumes:
+  urep-dev-state:

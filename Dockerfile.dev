@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim-bookworm
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      git ca-certificates curl iproute2 procps iptables \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+# venv van /src da ga bind mount ne prekrije
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/src/src \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /src
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project
+
+CMD ["pytest"]

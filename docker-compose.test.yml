@@ -1,0 +1,79 @@
+x-urep: &urep
+  image: urep:test
+  build:
+    context: .
+    dockerfile: Dockerfile
+
+services:
+  node-a:
+    <<: *urep
+    environment:
+      UREP_TOKEN: test-token
+      UREP_TAG: test
+      UREP_PREFIX: node-a
+      UREP_PATH: /urep/file.yaml
+      UREP_SEEDS: node-b:7801,node-c:7801
+      UREP_STATE_DIR: /var/lib/urep
+    volumes:
+      - ./tests/fixtures/node-a:/urep
+    healthcheck:
+      test: ["CMD", "urep", "status", "--json"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  node-b:
+    <<: *urep
+    environment:
+      UREP_TOKEN: test-token
+      UREP_TAG: test
+      UREP_PREFIX: node-b
+      UREP_PATH: /urep/file.yaml
+      UREP_SEEDS: node-a:7801,node-c:7801
+      UREP_STATE_DIR: /var/lib/urep
+    volumes:
+      - ./tests/fixtures/node-b:/urep
+    healthcheck:
+      test: ["CMD", "urep", "status", "--json"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  node-c:
+    <<: *urep
+    environment:
+      UREP_TOKEN: test-token
+      UREP_TAG: test
+      UREP_PREFIX: node-c
+      UREP_ROLE: slave
+      UREP_STATE_DIR: /var/lib/urep
+    volumes:
+      - ./tests/fixtures/node-c:/urep
+    healthcheck:
+      test: ["CMD", "urep", "status", "--json"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  test:
+    image: urep:dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    depends_on:
+      node-a:
+        condition: service_healthy
+      node-b:
+        condition: service_healthy
+      node-c:
+        condition: service_healthy
+    working_dir: /src
+    volumes:
+      - .:/src
+    environment:
+      UREP_TEST_TOKEN: test-token
+    command: ["pytest", "-m", "integration"]
+
+networks:
+  default:
+    name: urep-test
