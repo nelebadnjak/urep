@@ -214,3 +214,17 @@ def test_first_join_snapshots_local_before_remote(
     item = state[mirror_rel(path)]
     assert item.blob == blob_hash(b"remote\n")
     assert item.version == HLC(1000, 0, "peer")
+
+
+def test_paused_apply_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    daemon, root = _daemon(monkeypatch, tmp_path)
+    daemon.runtime.pause(inbound=True, outbound=True)
+    path = root / "app.yaml"
+    ok, reason = daemon._apply_remote(
+        _payload(path, b"one\n", HLC(1000, 0, "peer")), "peer"
+    )
+    assert not ok
+    assert reason == "paused"
+    assert not path.exists()

@@ -11,7 +11,7 @@ from typing import Any, NoReturn
 import typer
 
 from . import __version__
-from .config import Config, ConfigError, make_node_id
+from .config import Config, ConfigError, make_node_id, parse_duration_s
 from .daemon import Daemon
 from .gitrepo import GitError, GitRepo, git_version
 from .hlc import Clock
@@ -438,16 +438,33 @@ def restore(ref: str) -> None:
 
 
 @app.command()
-def pause() -> None:
+def pause(
+    inbound: bool = typer.Option(False, "--in"),
+    outbound: bool = typer.Option(False, "--out"),
+    duration: str | None = typer.Option(None, "--for"),
+) -> None:
     config = _load(False)
-    RuntimeState(config.state_dir / "state.json").set_paused(True)
-    typer.echo("paused")
+    if not inbound and not outbound:
+        inbound = True
+        outbound = True
+    until = None
+    if duration:
+        try:
+            until = time.time() + parse_duration_s(duration)
+        except ConfigError as exc:
+            _fail(exc)
+    RuntimeState(config.state_dir / "state.json").pause(inbound, outbound, until)
+    directions = ",".join(
+        name for name, enabled in (("in", inbound), ("out", outbound)) if enabled
+    )
+    suffix = f" for {duration}" if duration else ""
+    typer.echo(f"paused {directions}{suffix}")
 
 
 @app.command()
 def resume() -> None:
     config = _load(False)
-    RuntimeState(config.state_dir / "state.json").set_paused(False)
+    RuntimeState(config.state_dir / "state.json").resume()
     typer.echo("resumed")
 
 

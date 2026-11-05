@@ -55,6 +55,24 @@ def test_pause_resume(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_pause_direction(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("UREP_TOKEN", "secret")
+    monkeypatch.setenv("UREP_STATE_DIR", str(tmp_path / "state"))
+    result = runner.invoke(app, ["pause", "--in"])
+    assert result.exit_code == 0
+    data = json.loads((tmp_path / "state" / "state.json").read_text())
+    assert data["paused_in"] is True
+    assert data["paused_out"] is False
+    assert data["paused"] is False
+
+    resumed = runner.invoke(app, ["resume"])
+    assert resumed.exit_code == 0
+    data = json.loads((tmp_path / "state" / "state.json").read_text())
+    assert data["paused_in"] is False
+    assert data["paused_out"] is False
+
+
+@pytest.mark.unit
 def test_status_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("UREP_TOKEN", "secret")
     monkeypatch.setenv("UREP_STATE_DIR", str(tmp_path / "state"))

@@ -44,13 +44,42 @@ class RuntimeState:
             (json.dumps(data, indent=2, sort_keys=True) + "\n").encode(),
         )
 
-    def paused(self) -> bool:
-        return bool(self.load().get("paused", False))
+    def paused(self, direction: str | None = None) -> bool:
+        data = self.load()
+        until = data.get("paused_until")
+        if isinstance(until, (int, float)) and time.time() > until:
+            return False
+        if data.get("paused"):
+            return True
+        if direction == "in":
+            return bool(data.get("paused_in"))
+        if direction == "out":
+            return bool(data.get("paused_out"))
+        return bool(data.get("paused_in") or data.get("paused_out"))
+
+    def pause(
+        self,
+        inbound: bool = True,
+        outbound: bool = True,
+        until: float | None = None,
+    ) -> None:
+        data = self.load()
+        data["paused"] = inbound and outbound
+        data["paused_in"] = inbound
+        data["paused_out"] = outbound
+        data["paused_until"] = until
+        self.save(data)
+
+    def resume(self) -> None:
+        data = self.load()
+        data["paused"] = False
+        data["paused_in"] = False
+        data["paused_out"] = False
+        data["paused_until"] = None
+        self.save(data)
 
     def set_paused(self, paused: bool) -> None:
-        data = self.load()
-        data["paused"] = paused
-        self.save(data)
+        self.pause(paused, paused)
 
 
 class EventLog:

@@ -165,6 +165,8 @@ class Daemon:
                     last = self._last_manifest.get(node_id, 0.0)
                 if now - last < self.config.anti_entropy_s:
                     continue
+                if self.runtime.paused("out"):
+                    continue
                 try:
                     self._send_manifest(node_id)
                     with self._sync_lock:
@@ -410,12 +412,18 @@ class Daemon:
             log.debug("unknown message type %s from %s", msg_type, peer.node_id)
             return
         if message == Msg.MANIFEST:
+            if self.runtime.paused("in"):
+                return
             self._handle_manifest(peer, payload)
         elif message == Msg.FILE_GET:
+            if self.runtime.paused("out"):
+                return
             self._handle_file_get(peer, payload)
         elif message == Msg.FILE_PUT:
             await self._handle_file_put(peer, payload)
         elif message == Msg.FILE_CHUNK:
+            if self.runtime.paused("in"):
+                return
             await self._handle_file_chunk(peer, payload)
         elif message == Msg.FILE_DELETE:
             await self._handle_file_delete(peer, payload)
@@ -630,6 +638,8 @@ class Daemon:
     ) -> None:
         if self.transport is None:
             return
+        if self.runtime.paused("out"):
+            return
         channel = tags or self.config.tags
         payload = {
             "path": f"/{change.path}",
@@ -680,6 +690,8 @@ class Daemon:
     def _apply_remote_locked(
         self, payload: dict[str, Any], peer_node: str
     ) -> tuple[bool, str]:
+        if self.runtime.paused("in"):
+            return False, "paused"
         path_raw = payload.get("path")
         if not isinstance(path_raw, str):
             return False, "bad_path"
