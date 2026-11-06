@@ -1,47 +1,47 @@
-# uRep — CLI primer (v1.6)
+# uRep — CLI examples (v1.6)
 
-Praktičan cheat sheet za konfiguraciju bez config fajla: samo CLI + `UREP_*` env.
-Precedence: **CLI > ENV > default**. Nema `urep.toml`, nema `paths.d/`, nema `--config`.
+A practical cheat sheet for configuration without a config file: just CLI + `UREP_*` env.
+Precedence: **CLI > ENV > default**. No `urep.toml`, no `paths.d/`, no `--config`.
 
 ---
 
-## 1. Pokretanje
+## 1. Starting
 
 ```bash
-# sve kroz CLI — "peer" koji šalje i prima
+# everything via CLI — a "peer" that sends and receives
 urep --token 123 \
      --tag nginx \
      --path /etc/nginx/nginx.conf \
      --post-hook 'nginx -t && nginx -s reload'
 
-# isto kroz ENV
+# the same via ENV
 export UREP_TOKEN=123
 export UREP_TAG=nginx
 export UREP_PATH=/etc/nginx/nginx.conf
 export UREP_POST_HOOK='nginx -t && nginx -s reload'
 urep
 
-# slave: samo prima, ne mora ni UREP_PATH
+# slave: only receives, does not even need UREP_PATH
 UREP_TOKEN=123 UREP_TAG=nginx UREP_ROLE=slave urep
 
-# foreground za debug
+# foreground for debugging
 urep daemon -f --token 123 --tag nginx --path /app.yaml
 ```
 
-`urep` bez podkomande = `urep daemon`.
+`urep` without a subcommand = `urep daemon`.
 
-### Flagovi
+### Flags
 
 ```bash
 urep [--token T] [--prefix P] [--tag T]... [--path P]... [--root R]...
      [--slave] [--listen ADDR] [--pre-hook CMD] [--post-hook CMD]
 ```
 
-- `--token` je jedini obavezan flag.
-- Alternative: `--token-file`, `UREP_TOKEN`, `UREP_TOKEN_FILE`.
-- **Nema `--name`** — node ID je disposable UUID po startu, ne čuva se.
-- `--prefix` daje čitljiv ID: `<prefix>-<uuid>` (npr. `bg-3f9a1c2b-...`).
-- `--tag` i `--path` su repeatable; u ENV-u su comma-separated.
+- `--token` is the only required flag.
+- Alternatives: `--token-file`, `UREP_TOKEN`, `UREP_TOKEN_FILE`.
+- **No `--name`** — the node ID is a disposable UUID generated at startup and is not persisted.
+- `--prefix` gives a readable ID: `<prefix>-<uuid>` (for example `bg-3f9a1c2b-...`).
+- `--tag` and `--path` are repeatable; in ENV they are comma-separated.
 - Token precedence: `--token` > `--token-file` > `UREP_TOKEN` > `UREP_TOKEN_FILE`.
 
 ---
@@ -69,7 +69,7 @@ docker run -d --name urep-app-slave \
   urep:latest
 ```
 
-Umesto tokena u env-u (vidljiv u `docker inspect`), koristi Docker secret:
+Instead of the token in an env var (visible in `docker inspect`), use a Docker secret:
 
 ```bash
 docker run -d --name urep-app \
@@ -82,11 +82,12 @@ docker run -d --name urep-app \
   urep:latest
 ```
 
-Preporuka: **jedan kontejner = jedan fajl = jedan hook**.
+Recommendation: **one container = one file = one hook**.
 
 ---
 
-## 3. Init i token
+## 3. Init and token
+
 ```bash
 urep init --print-token
 # Generated /etc/urep/token (0600)
@@ -95,7 +96,7 @@ urep init --print-token
 urep init --token-file /etc/urep/token
 ```
 
-Generator imena bez pokretanja daemona:
+Name generator without starting the daemon:
 
 ```bash
 urep id
@@ -105,7 +106,7 @@ urep id --prefix bg
 # bg-3f9a1c2b-7d4e-4a8f-9c1d-2e3f4a5b6c7d
 ```
 
-`urep id` je samo informativno — daemon uvek generiše novi UUID pri startu i ne prima ga spolja.
+`urep id` is informational only — the daemon always generates a new UUID at startup and does not accept one from outside.
 
 ## 3.1 Ping
 
@@ -114,11 +115,11 @@ urep ping 10.0.0.12:7801
 # pong from 3f9a1c2b-7d4e-4a8f-9c1d-2e3f4a5b6c7d role=peer tags=test rtt=1.2ms
 ```
 
-Token se čita iz `UREP_TOKEN` / `UREP_TOKEN_FILE` (ili `--token`). `ping` proverava handshake i AEAD bez čekanja na discovery.
+The token is read from `UREP_TOKEN` / `UREP_TOKEN_FILE` (or `--token`). `ping` verifies the handshake and AEAD without waiting for discovery.
 
 ---
 
-## 4. Pregled stanja
+## 4. State overview
 
 ```bash
 urep status
@@ -157,17 +158,17 @@ urep config
 # repo_dir     /var/lib/urep/repo
 ```
 
-`urep config` nikad ne ispisuje token u clear-u.
+`urep config` never prints the token in clear text.
 
 ---
 
 ## 5. Debug
 
 ```bash
-urep pause                    # pauzira oba smera
-urep pause --in               # samo prijem
-urep pause --out --for 10m    # samo slanje, 10 minuta
-urep resume                   # odmah pokreće anti-entropy
+urep pause                    # pauses both directions
+urep pause --in               # receive only
+urep pause --out --for 10m    # send only, 10 minutes
+urep resume                   # starts anti-entropy immediately
 ```
 
 ```bash
@@ -178,7 +179,7 @@ urep events -f
 
 ---
 
-## 6. Istorija (git)
+## 6. History (git)
 
 ```bash
 urep log
@@ -188,12 +189,12 @@ urep log /etc/nginx/nginx.conf -n 3
 
 urep show a1b2c3d              # commit + diff
 urep diff a1b2c3d /etc/nginx/nginx.conf
-urep revert a1b2c3d            # novi commit; replikuje se kao i svaka izmena
+urep revert a1b2c3d            # new commit; replicates like any other change
 ```
 
 ---
 
-## 7. Konflikti
+## 7. Conflicts
 
 ```bash
 urep conflicts
@@ -206,18 +207,18 @@ urep restore refs/urep/conflict/2f1a.../1762359723412-0-web-01-a1b2c3
 
 ---
 
-## 8. Ručna sinhronizacija
+## 8. Manual synchronization
 
 ```bash
 urep sync
 urep sync --peer web-02
 urep sync --path /etc/nginx/nginx.conf --force
-urep sync --no-hooks           # primeni bez pokretanja hook-ova
+urep sync --no-hooks           # apply without running hooks
 ```
 
 ---
 
-## 9. Dijagnostika
+## 9. Diagnostics
 
 ```bash
 urep doctor
@@ -235,19 +236,19 @@ urep version
 
 ---
 
-## 10. Šta namerno ne postoji
+## 10. What deliberately does not exist
 
 ```bash
-urep path add ...     # nema — putanje kroz --path / UREP_PATH
-urep root add ...     # nema — UREP_ACCEPT_ROOTS
-urep --config ...     # nema — nema config fajla
+urep path add ...     # none — paths via --path / UREP_PATH
+urep root add ...     # none — UREP_ACCEPT_ROOTS
+urep --config ...     # none — there is no config file
 ```
 
-Izmena konfiguracije = restart procesa/kontejnera sa novim env-om ili flagovima.
+Configuration changes = restart the process/container with new env or flags.
 
 ---
 
-## 11. ENV referenca
+## 11. ENV reference
 
 | ENV | Default | CLI |
 |---|---|---|
@@ -256,17 +257,17 @@ Izmena konfiguracije = restart procesa/kontejnera sa novim env-om ili flagovima.
 | `UREP_PREFIX` | — | `--prefix` |
 | `UREP_TAG` | `default` | `--tag` |
 | `UREP_ROLE` | `peer` | `--slave` |
-| `UREP_PATH` | prazno → receive-only | `--path` |
+| `UREP_PATH` | empty → receive-only | `--path` |
 | `UREP_DATA_DIR` | `/urep` | — |
 | `UREP_STATE_DIR` | `/var/lib/urep` | — |
-| `UREP_ACCEPT_ROOTS` | data dir + parent dirs putanja | `--root` |
+| `UREP_ACCEPT_ROOTS` | data dir + parent dirs of paths | `--root` |
 | `UREP_LISTEN` | `0.0.0.0:7801` | `--listen` |
 | `UREP_MULTICAST` | `true` | — |
 | `UREP_MULTICAST_GROUP` | `239.255.42.99:7802` | — |
 | `UREP_ANNOUNCE_INTERVAL` | `5s` | — |
 | `UREP_PEER_TIMEOUT` | `30s` | — |
-| `UREP_SEEDS` | prazno | — |
-| `UREP_PRE_HOOK` / `UREP_POST_HOOK` | prazno | `--pre-hook` / `--post-hook` |
+| `UREP_SEEDS` | empty | — |
+| `UREP_PRE_HOOK` / `UREP_POST_HOOK` | empty | `--pre-hook` / `--post-hook` |
 | `UREP_HOOKS_ENABLED` | `true` | — |
 | `UREP_HOOK_TIMEOUT` | `30s` | — |
 | `UREP_DEBOUNCE` | `200ms` | — |

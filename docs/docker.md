@@ -1,19 +1,19 @@
-# uRep — Docker razvoj i testiranje
+# uRep — Docker development and testing
 
-Deo plana v1.7. **Pravilo: nijedan korak razvoja, testiranja ili build-a se ne izvršava na hostu.**
-Host sme samo `docker` i `make`; nema host `python`, nema host `.venv`, nema host `pytest`.
+Part of the v1.7 plan. **Rule: no development, testing, or build step runs on the host.**
+The host may only use `docker` and `make`; no host `python`, no host `.venv`, no host `pytest`.
 
 ---
 
-## 1. Fajlovi
+## 1. Files
 
 ```
 .
 ├── Dockerfile                 # runtime image (Python + git)
 ├── Dockerfile.dev             # dev/test image (Python + git + pytest/ruff/mypy)
-├── docker-compose.dev.yml     # interaktivni dev
-├── docker-compose.test.yml    # 3-nod integration + test runner
-├── Makefile                   # jedini ulaz: make test / make dev / make build
+├── docker-compose.dev.yml     # interactive dev
+├── docker-compose.test.yml    # 3-node integration + test runner
+├── Makefile                   # single entry point: make test / make dev / make build
 ├── .dockerignore
 ├── pyproject.toml
 ├── uv.lock
@@ -24,7 +24,7 @@ Host sme samo `docker` i `make`; nema host `python`, nema host `.venv`, nema hos
 
 ## 2. Runtime image
 
-`python:3.12-slim-bookworm` + `git` (bookworm ima git 2.39 → SHA-256 repo podržan).
+`python:3.12-slim-bookworm` + `git` (bookworm has git 2.39 → SHA-256 repos supported).
 
 ```dockerfile
 # syntax=docker/dockerfile:1
@@ -71,14 +71,14 @@ ENTRYPOINT ["urep"]
 CMD ["daemon"]
 ```
 
-Napomena: image je root po defaultu jer hooks i `/etc` upisi to traže. Ako se koristi samo `/urep`, može `--user 10001:10001` uz odgovarajuće permisije volume-a.
+Note: the image runs as root by default because hooks and `/etc` writes require it. If only `/urep` is used, `--user 10001:10001` works with appropriate volume permissions.
 
 Build:
 
 ```bash
 docker build -t urep:dev .
 docker run --rm urep:dev version
-docker run --rm urep:dev doctor      # proverava git >= 2.29 + sha256
+docker run --rm urep:dev doctor      # checks git >= 2.29 + sha256
 ```
 
 ---
@@ -96,7 +96,7 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir uv
 
-# venv van /src da ga bind mount ne prekrije
+# venv outside /src so the bind mount does not hide it
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     PYTHONPATH=/src/src \
     PYTHONUNBUFFERED=1
@@ -108,15 +108,15 @@ RUN uv sync --frozen --no-install-project
 CMD ["pytest"]
 ```
 
-Test markeri u `pyproject.toml`:
+Test markers in `pyproject.toml`:
 
 ```toml
 [tool.pytest.ini_options]
 markers = [
-  "unit: brzi testovi bez mreže",
-  "integration: visenodni klaster u Dockeru",
-  "chaos: particija / kill -9 / clock skew (NET_ADMIN)",
-  "multicast: zahteva host mrežu",
+  "unit: fast tests without network",
+  "integration: multi-node cluster in Docker",
+  "chaos: partition / kill -9 / clock skew (NET_ADMIN)",
+  "multicast: requires host network",
 ]
 ```
 
@@ -147,7 +147,7 @@ volumes:
 
 ```bash
 docker compose -f docker-compose.dev.yml run --rm dev bash
-# u kontejneru:
+# inside the container:
 pytest -m unit
 ruff check .
 mypy src
@@ -229,13 +229,13 @@ networks:
     name: urep-test
 ```
 
-### Multicast napomena
+### Multicast note
 
-Docker bridge **ne prosleđuje multicast**. Zato:
+Docker bridge **does not forward multicast**. Therefore:
 
-- integracioni testovi koriste `UREP_SEEDS` (deterministički);
-- `-m multicast` test ide sa `network_mode: host` (Linux) ili macvlan i opt-in je;
-- `-m chaos` testovi traže `cap_add: [NET_ADMIN]` (iptables particija) i `kill -9` na container proces.
+- integration tests use `UREP_SEEDS` (deterministic);
+- the `-m multicast` test runs with `network_mode: host` (Linux) or macvlan and is opt-in;
+- `-m chaos` tests require `cap_add: [NET_ADMIN]` (iptables partition) and `kill -9` on the container process.
 
 ---
 
@@ -297,7 +297,7 @@ jobs:
       - run: make smoke
 ```
 
-Nema `actions/setup-python`; nema instalacije zavisnosti na hostu.
+No `actions/setup-python`; no dependency installation on the host.
 
 ---
 
@@ -317,21 +317,21 @@ build
 
 ---
 
-## 9. Kriteriji prihvatanja
+## 9. Acceptance criteria
 
-- [ ] `docker build -f Dockerfile.dev .` prolazi na hostu gde postoji samo Docker.
-- [ ] `make test` prolazi bez host Python-a.
-- [ ] Runtime image sadrži `git >= 2.29` i `urep doctor` potvrđuje SHA-256 repo.
-- [ ] `make test-integration` podiže 3 noda i dokazuje konvergenciju.
-- [ ] `make test-chaos` prolazi sa `NET_ADMIN`.
-- [ ] `make smoke` pokreće runtime image i `urep doctor` je zelen.
-- [ ] Nijedan dokumentovan korak ne pominje host `pip`, `venv` ili `pytest`.
+- [ ] `docker build -f Dockerfile.dev .` passes on a host that only has Docker.
+- [ ] `make test` passes without host Python.
+- [ ] The runtime image contains `git >= 2.29` and `urep doctor` confirms the SHA-256 repo.
+- [ ] `make test-integration` brings up 3 nodes and proves convergence.
+- [ ] `make test-chaos` passes with `NET_ADMIN`.
+- [ ] `make smoke` runs the runtime image and `urep doctor` is green.
+- [ ] No documented step mentions host `pip`, `venv`, or `pytest`.
 
 ---
 
-## 10. Napomene
+## 10. Notes
 
-- Multi-arch build (opciono): `docker buildx build --platform linux/amd64,linux/arm64`.
-- Runtime image je ~150–200 MB (`python:3.12-slim` + git).
-- Ako je potreban non-root: `--user 10001:10001` i volume-i sa odgovarajućim vlasništvom; hooks tada ne mogu da rade stvari koje traže root.
-- `uv.lock` je obavezan u buildu (`--frozen`); bez njega build pada.
+- Multi-arch build (optional): `docker buildx build --platform linux/amd64,linux/arm64`.
+- The runtime image is ~150–200 MB (`python:3.12-slim` + git).
+- If non-root is required: `--user 10001:10001` and volumes with appropriate ownership; hooks then cannot do things that require root.
+- `uv.lock` is required in the build (`--frozen`); without it the build fails.
