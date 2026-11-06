@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from urep import __version__
 from urep.cli import app
 
 runner = CliRunner()
@@ -16,7 +17,7 @@ runner = CliRunner()
 def test_version() -> None:
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert "urep 0.1.0" in result.output
+    assert f"urep {__version__}" in result.output
 
 
 @pytest.mark.unit
